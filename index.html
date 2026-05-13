@@ -7,8 +7,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
     <style>
         :root { 
-            --accent: #0070f3; /* Biru Profesional */
-            --accent-2: #7928ca; /* Ungu Modern */
+            --accent: #0070f3;
+            --accent-2: #7928ca;
             --bg: #ffffff; 
             --card-bg: #f8f9fa;
             --text-main: #1a1a1a;
@@ -27,7 +27,6 @@
             min-height: 100vh;
         }
 
-        /* Layout Full Page */
         .container {
             flex: 1;
             display: flex;
@@ -54,7 +53,6 @@
 
         .header span { color: var(--accent); }
 
-        /* Main Dashboard */
         .dashboard {
             width: 100%;
             display: grid;
@@ -95,7 +93,30 @@
         .info-label { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; font-weight: bold; }
         .info-value { font-size: 0.9rem; font-weight: 700; display: block; color: var(--accent-2); }
 
-        /* Speedometer Area */
+        /* Processing item memenuhi 2 kolom */
+        .info-item.wide { grid-column: 1 / -1; }
+
+        .processing-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            margin-top: 6px;
+        }
+
+        .processing-block {
+            flex: 1;
+            text-align: center;
+            background: var(--card-bg);
+            padding: 10px 8px;
+            border-radius: 10px;
+            border: 1px solid #eee;
+        }
+
+        .processing-block .p-arrow { font-size: 0.7rem; color: var(--text-muted); font-weight: 700; display: block; margin-bottom: 2px; }
+        .processing-block .p-num { font-size: 1.1rem; font-weight: 900; color: var(--accent-2); }
+        .processing-block .p-unit { font-size: 0.6rem; color: var(--text-muted); font-weight: 600; }
+
         .speed-value { 
             font-size: 6rem; 
             font-weight: 900; 
@@ -176,6 +197,23 @@
                     <span class="info-label">Device Type</span>
                     <span class="info-value" id="device-display">...</span>
                 </div>
+
+                <!-- Processing MB/detik -->
+                <div class="info-item wide">
+                    <span class="info-label">Processing MB / detik</span>
+                    <div class="processing-row">
+                        <div class="processing-block">
+                            <span class="p-arrow">&#8595; DOWNLOAD</span>
+                            <span class="p-num" id="proc-down">0.00</span>
+                            <span class="p-unit">MB/s</span>
+                        </div>
+                        <div class="processing-block">
+                            <span class="p-arrow">&#8593; UPLOAD</span>
+                            <span class="p-num" id="proc-up">0.00</span>
+                            <span class="p-unit">MB/s</span>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <div class="stats-grid">
@@ -228,36 +266,17 @@ const UP_BACKUP = "https://httpbin.org/post";
 let finalDownload = 0;
 let finalUpload = 0;
 
-// === FUNGSI DETEKSI PERANGKAK YANG DIPERBAIKI ===
+// === Deteksi Mobile / Desktop ===
 function getDeviceInfo() {
     const ua = navigator.userAgent;
-    const platform = navigator.platform || "";
-    let device = "Unknown Device";
+    let device = "Desktop";
 
-    // Deteksi Mobile & Tablet dulu
-    if (/(tablet|ipad|playbook|silk)|(android(?!.*mobi))/i.test(ua)) {
-        device = "Tablet";
-    } else if (/Mobile|Android|iP(hone|od)|IEMobile|BlackBerry|Kindle|Silk-Accelerated|(hpw|web)OS|Opera M(obi|ini)/.test(ua)) {
-        device = "Mobile Device";
-    } else {
-        // Logika untuk Desktop, Laptop, Komputer, Server
-        // Karena browser tidak bisa membedakan PC fisik vs Laptop vs Server,
-        // kita gunakan label yang Anda minta berdasarkan OS.
-        
-        if (/Win/i.test(platform) || /Windows NT/i.test(ua)) {
-            device = "Desktop / Laptop"; // Windows bisa keduanya
-        } else if (/Mac/i.test(platform) || /Macintosh/i.test(ua)) {
-            device = "Desktop / Laptop (Mac)"; // Mac bisa iMac atau MacBook
-        } else if (/Linux/i.test(platform) || /Linux/i.test(ua)) {
-            // Linux sering digunakan untuk Server atau Desktop kustom
-            device = "Desktop / Server (Linux)"; 
-        } else if (/CrOS/i.test(ua)) {
-            device = "Chromebook / Laptop";
-        } else {
-            device = "Komputer / PC"; // Fallback umum
-        }
+    if (/Mobi|Android.*Mobile|iPhone|iPod|BlackBerry|IEMobile|Opera Mini|Kindle|Silk-Accelerated|(hpw|web)OS|Mobile/i.test(ua)) {
+        device = "Mobile";
+    } else if (/iPad|Android(?!.*Mobile)|Tablet|PlayBook|Silk/i.test(ua)) {
+        device = "Mobile"; // Tablet masuk kategori Mobile
     }
-    
+
     document.getElementById('device-display').innerText = device;
 }
 
@@ -291,6 +310,10 @@ async function runFullTest() {
     btn.innerText = "TESTING...";
     document.getElementById('rating-result').style.display = "none";
     
+    // Reset Processing MB/s
+    document.getElementById('proc-down').innerText = "0.00";
+    document.getElementById('proc-up').innerText = "0.00";
+
     // Latency Test
     document.getElementById('test-label').innerText = "LATENCY";
     let pings = [];
@@ -345,15 +368,21 @@ function updateUI(bytes, start, isDown) {
     const duration = (performance.now() - start) / 1000;
     if (duration <= 0) return;
     
+    // Mbps (Megabit per detik)
     const mbps = ((bytes * 8) / duration) / 1000000;
+    // MB/s (Megabyte per detik) — 1 Byte = 8 bit
+    const mbs = mbps / 8;
+
     document.getElementById('main-speed').innerText = mbps.toFixed(1);
     document.getElementById('p-bar').style.width = Math.min((duration / 7) * 100, 100) + "%";
     
     if (isDown) {
         document.getElementById('down-val').innerText = mbps.toFixed(1) + " Mbps";
+        document.getElementById('proc-down').innerText = mbs.toFixed(2);
         finalDownload = mbps;
     } else {
         document.getElementById('up-val').innerText = mbps.toFixed(1) + " Mbps";
+        document.getElementById('proc-up').innerText = mbs.toFixed(2);
         finalUpload = mbps;
     }
 }
